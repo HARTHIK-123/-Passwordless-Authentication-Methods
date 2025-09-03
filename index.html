@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Passwordless Authentication + Cipher Lab</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root{
+      --bg1:#667eea; --bg2:#764ba2; --accent1:#6a11cb; --accent2:#2575fc; --btn1:#ff416c; --btn2:#ff4b2b;
+      --glass: rgba(255,255,255,0.12);
+      --text:#fff; --muted:#cfd2ff;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+      min-height:100vh; display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(135deg,var(--bg1),var(--bg2)); color:var(--text);
+      padding:24px;
+    }
+    .container{
+      width:min(920px, 96vw);
+      display:grid; grid-template-columns: 1fr; gap:24px;
+    }
+    .card{
+      background:var(--glass); backdrop-filter: blur(16px);
+      border:1px solid rgba(255,255,255,0.15);
+      border-radius:22px; padding:24px; box-shadow:0 12px 40px rgba(0,0,0,0.25);
+    }
+    h2{margin:0 0 16px; font-size:28px; letter-spacing:0.3px}
+    .tabs{display:flex; gap:8px; margin-bottom:16px}
+    .tabs button{
+      flex:1; padding:12px 14px; border:none; border-radius:14px; color:var(--text);
+      background:rgba(255,255,255,0.15); cursor:pointer; transition:0.25s;
+    }
+    .tabs button.active{ background: linear-gradient(45deg,var(--accent1),var(--accent2)); font-weight:600 }
+    .form{display:none}
+    .form.active{display:block}
+    .row{display:grid; gap:12px}
+    .input{
+      position:relative;
+    }
+    .input input, .input textarea, .input select{
+      width:100%; border:none; outline:none; border-radius:14px; padding:14px 14px;
+      background:rgba(255,255,255,0.9); color:#1b1b1f; font-size:16px;
+    }
+    .input textarea{min-height:140px; resize:vertical}
+    .label{
+      font-size:12px; color:#2b2b31; opacity:0.8; margin-bottom:6px; display:block;
+    }
+    .btn{
+      border:none; border-radius:14px; padding:12px 16px; font-weight:700; cursor:pointer;
+      background:linear-gradient(45deg,var(--btn1),var(--btn2)); color:white; transition:transform .15s;
+    }
+    .btn:hover{ transform: translateY(-1px) }
+    .btn.secondary{
+      background:rgba(255,255,255,0.15);
+      border:1px solid rgba(255,255,255,0.25);
+    }
+    .stack{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+    .message{margin-top:10px; font-weight:700}
+    .success{color:#00ffd0}
+    .error{color:#ffd1d1}
+    .otp-boxes{display:flex; gap:8px; margin:12px 0}
+    .otp-boxes input{
+      width:46px; height:54px; text-align:center; font-size:20px; border-radius:12px; border:none; outline:none;
+      background:rgba(255,255,255,0.9);
+    }
+    .grid-two{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+    .hide{display:none !important}
+    .topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px}
+    .pill{padding:6px 10px; border-radius:999px; background:rgba(255,255,255,0.15); font-size:12px}
+    .footer-note{color:var(--muted); font-size:12px; margin-top:8px}
+    @media (max-width:720px){
+      .grid-two{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- AUTH CARD -->
+    <div id="authCard" class="card">
+      <h2>Passwordless Auth</h2>
+      <div class="tabs">
+        <button id="tabMagic" class="active" onclick="showForm('magic', event)">Magic Link</button>
+        <button id="tabOtp" onclick="showForm('otp', event)">OTP</button>
+      </div>
+
+      <!-- Magic Link -->
+      <div id="magic" class="form active">
+        <div class="row">
+          <div class="input">
+            <label class="label">Email Address</label>
+            <input type="email" id="magicEmail" placeholder="your@email.com" />
+          </div>
+          <div class="stack">
+            <button class="btn" onclick="sendMagicLink()">Send Magic Link</button>
+          </div>
+          <div id="magicMessage" class="message"></div>
+        </div>
+      </div>
+
+      <!-- OTP -->
+      <div id="otp" class="form">
+        <div class="row">
+          <div class="input">
+            <label class="label">Phone Number</label>
+            <input type="tel" id="otpPhone" placeholder="10-digit number (e.g., 9876543210)" />
+          </div>
+          <div class="stack">
+            <button class="btn" onclick="sendOTP()">Send OTP</button>
+          </div>
+
+          <div id="otpSection" class="hide">
+            <div class="otp-boxes">
+              <input maxlength="1" oninput="moveNext(this,0)" />
+              <input maxlength="1" oninput="moveNext(this,1)" />
+              <input maxlength="1" oninput="moveNext(this,2)" />
+              <input maxlength="1" oninput="moveNext(this,3)" />
+              <input maxlength="1" oninput="moveNext(this,4)" />
+              <input maxlength="1" oninput="moveNext(this,5)" />
+            </div>
+            <div class="stack">
+              <button class="btn" onclick="verifyOTP()">Verify OTP</button>
+              <button class="btn secondary" onclick="clearOtpInputs()">Clear</button>
+            </div>
+          </div>
+
+          <div id="otpMessage" class="message"></div>
+        </div>
+      </div>
+      <div class="footer-note">Demo mode: Magic link & OTP are printed in the browser console.</div>
+    </div>
+
+    <!-- APP CARD (shown after login) -->
+    <div id="appCard" class="card hide">
+      <div class="topbar">
+        <h2>🔐 Cipher Lab</h2>
+        <div class="stack">
+          <span id="loginMethod" class="pill">Logged in</span>
+          <button class="btn secondary" onclick="logout()">Logout</button>
+        </div>
+      </div>
+
+      <div class="grid-two">
+        <div class="row">
+          <div class="input">
+            <label class="label">Plain / Cipher Text</label>
+            <textarea id="plainText" placeholder="Type or paste your text here..."></textarea>
+          </div>
+          <div class="stack">
+            <button class="btn" onclick="copyFrom('plainText')">Copy</button>
+            <button class="btn secondary" onclick="document.getElementById('plainText').value=''">Clear</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="input">
+            <label class="label">Key</label>
+            <input id="keyInput" placeholder="Depends on cipher (see hint below)" />
+          </div>
+          <div class="input">
+            <label class="label">Cipher</label>
+            <select id="cipherSelect" onchange="onCipherChange()">
+              <!-- Substitution (6) -->
+              <option value="caesar">Caesar (shift)</option>
+              <!-- <option value="rot13">ROT13 (no key)</option> -->
+              <!-- <option value="atbash">Atbash (no key)</option> -->
+              <option value="vigenere">Vigenère (alpha key)</option>
+              <!-- <option value="affine">Affine (a,b)</option> -->
+              <option value="keyword">Keyword Substitution (keyword)</option>
+              <!-- Transposition (2) -->
+              <option value="railfence">Rail Fence (rails)</option>
+              <option value="columnar">Columnar Transposition (keyword)</option>
+            </select>
+          </div>
+          <div id="hint" class="footer-note">Hint: Caesar uses numeric key like 3; Affine uses "a,b" where a is coprime with 26 (e.g., 5,8).</div>
+
+          <div class="stack">
+            <button class="btn" onclick="runCipher('enc')">Encrypt</button>
+            <button class="btn secondary" onclick="runCipher('dec')">Decrypt</button>
+          </div>
+
+          <div class="input">
+            <label class="label">Result</label>
+            <textarea id="resultText" placeholder="Result appears here..." readonly></textarea>
+          </div>
+          <div class="stack">
+            <button class="btn" onclick="copyFrom('resultText')">Copy Result</button>
+            <button class="btn secondary" onclick="swapTexts()">Swap ↔️</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* -------------------- AUTH -------------------- */
+    let generatedOTP = "";
+    let generatedMagicLink = "";
+
+    function showForm(id, e){
+      document.querySelectorAll('.form').forEach(f=>f.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+      if(e) e.target.classList.add('active');
+    }
+
+    // Magic Link (console demo)
+    function sendMagicLink(){
+      const email = document.getElementById('magicEmail').value.trim();
+      const msg = document.getElementById('magicMessage');
+      if(!email){
+        msg.innerHTML = "<span class='error'>Please enter email.</span>";
+        return;
+      }
+      // Fake link
+      generatedMagicLink = "https://myauth.com/login/" + Math.random().toString(36).slice(2, 12);
+      console.log("Generated Magic Link:", generatedMagicLink);
+      msg.innerHTML = "✅ Magic link generated. (Check console) <br/><br/>";
+      const btn = document.createElement('button');
+      btn.className = "btn";
+      btn.textContent = "Open Magic Link";
+      btn.onclick = ()=> completeLogin("Magic Link");
+      msg.appendChild(btn);
+    }
+
+    // OTP
+    function sendOTP(){
+      const phone = document.getElementById('otpPhone').value.trim();
+      const msg = document.getElementById('otpMessage');
+      const section = document.getElementById('otpSection');
+      if(!/^\d{10}$/.test(phone)){
+        msg.innerHTML = "<span class='error'>Please enter a 10-digit phone number.</span>";
+        section.classList.add('hide');
+        return;
+      }
+      generatedOTP = Math.floor(100000 + Math.random()*900000).toString();
+      console.log("Generated OTP:", generatedOTP);
+      msg.innerHTML = "📩 OTP generated. (Check console)";
+      section.classList.remove('hide');
+      clearOtpInputs();
+    }
+
+    function moveNext(current, idx){
+      if(current.value.length === 1 && idx < 5){
+        current.nextElementSibling.focus();
+      }
+    }
+    function clearOtpInputs(){
+      document.querySelectorAll('.otp-boxes input').forEach(inp => inp.value = "");
+      document.querySelector('.otp-boxes input').focus();
+    }
+    function verifyOTP(){
+      let entered = "";
+      document.querySelectorAll('.otp-boxes input').forEach(inp => entered += inp.value);
+      const msg = document.getElementById('otpMessage');
+      if(entered === generatedOTP){
+        msg.innerHTML = "<span class='success'>🎉 OTP Verified Successfully!</span>";
+        completeLogin("OTP");
+      }else{
+        msg.innerHTML = "<span class='error'>Wrong OTP. Try again.</span>";
+      }
+    }
+
+    function completeLogin(method){
+      document.getElementById('authCard').classList.add('hide');
+      document.getElementById('appCard').classList.remove('hide');
+      document.getElementById('loginMethod').textContent = `Logged in via ${method}`;
+    }
+    function logout(){
+      document.getElementById('authCard').classList.remove('hide');
+      document.getElementById('appCard').classList.add('hide');
+      // Reset messages
+      document.getElementById('magicMessage').innerHTML = "";
+      document.getElementById('otpMessage').innerHTML = "";
+      document.getElementById('otpSection').classList.add('hide');
+      generatedOTP=""; generatedMagicLink="";
+    }
+
+    /* -------------------- CIPHER LAB -------------------- */
+    const alpha = "abcdefghijklmnopqrstuvwxyz";
+
+    function normalizeText(txt){
+      return txt.replace(/\r/g,"");
+    }
+
+    function onCipherChange(){
+      const cipher = document.getElementById('cipherSelect').value;
+      const key = document.getElementById('keyInput');
+      const hint = document.getElementById('hint');
+      key.disabled = false;
+      key.value = "";
+      switch(cipher){
+        case "caesar":
+          key.placeholder = "Number shift (e.g., 3)";
+          hint.textContent = "Hint: Caesar uses numeric key like 3. Use negative for left shift when decrypting manually.";
+          break;
+        case "rot13":
+          key.placeholder = "No key needed";
+          key.disabled = true;
+          hint.textContent = "Hint: ROT13 requires no key.";
+          break;
+        case "atbash":
+          key.placeholder = "No key needed";
+          key.disabled = true;
+          hint.textContent = "Hint: Atbash mirrors A↔Z, B↔Y. No key.";
+          break;
+        case "vigenere":
+          key.placeholder = "Alphabetic key (e.g., LEMON)";
+          hint.textContent = "Hint: Vigenère key letters A–Z only.";
+          break;
+        case "affine":
+          key.placeholder = "a,b (e.g., 5,8)";
+          hint.textContent = "Hint: Affine uses 'a,b' with gcd(a,26)=1 (valid a: 1,3,5,7,9,11,15,17,19,21,23,25).";
+          break;
+        case "keyword":
+          key.placeholder = "Keyword (e.g., SECRET)";
+          hint.textContent = "Hint: Keyword Substitution builds an alphabet from the keyword + remaining letters.";
+          break;
+        case "railfence":
+          key.placeholder = "Rails (e.g., 3)";
+          hint.textContent = "Hint: Rail Fence uses an integer rails count.";
+          break;
+        case "columnar":
+          key.placeholder = "Keyword (e.g., ZEBRA)";
+          hint.textContent = "Hint: Columnar Transposition uses an alphabetic keyword.";
+          break;
+      }
+    }
+    onCipherChange(); // init
+
+    function runCipher(mode){
+      const cipher = document.getElementById('cipherSelect').value;
+      const text = normalizeText(document.getElementById('plainText').value);
+      const key = document.getElementById('keyInput').value.trim();
+      if(!text){
+        document.getElementById('resultText').value = "";
+        return;
+      }
+      let out="";
+      try{
+        switch(cipher){
+          // ---- Substitution ----
+          case "caesar": out = (mode==="enc") ? caesar(text, +key) : caesar(text, -key); break;
+          case "rot13": out = caesar(text, 13); break;
+          case "atbash": out = atbash(text); break;
+          case "vigenere": out = (mode==="enc") ? vigenere(text, key, 1) : vigenere(text, key, -1); break;
+          case "affine": {
+            const parts = key.split(",").map(s=>parseInt(s.trim(),10));
+            if(parts.length!==2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) throw new Error("Affine key must be 'a,b'");
+            out = (mode==="enc") ? affine(text, parts[0], parts[1]) : affineDec(text, parts[0], parts[1]);
+            break;
+          }
+          case "keyword": out = (mode==="enc") ? keywordSub(text, key, true) : keywordSub(text, key, false); break;
+
+          // ---- Transposition ----
+          case "railfence": {
+            const rails = parseInt(key,10);
+            if(!Number.isFinite(rails) || rails<2) throw new Error("Rails must be integer ≥ 2");
+            out = (mode==="enc") ? railFenceEnc(text, rails) : railFenceDec(text, rails);
+            break;
+          }
+          case "columnar":
+            if(!/^[A-Za-z]+$/.test(key)) throw new Error("Keyword must be letters only");
+            out = (mode==="enc") ? columnarEnc(text, key) : columnarDec(text, key);
+            break;
+        }
+      }catch(err){
+        out = `Error: ${err.message}`;
+      }
+      document.getElementById('resultText').value = out;
+    }
+
+    function copyFrom(id){
+      const el = document.getElementById(id);
+      el.select(); el.setSelectionRange(0, 99999);
+      document.execCommand('copy');
+    }
+    function swapTexts(){
+      const a = document.getElementById('plainText');
+      const b = document.getElementById('resultText');
+      const tmp = a.value; a.value = b.value; b.value = tmp;
+    }
+
+    /* --------- Cipher Implementations --------- */
+
+    // Caesar/ROT13
+    function caesar(str, shift){
+      if(!Number.isFinite(+shift)) throw new Error("Shift must be a number");
+      const s = ((+shift)%26 + 26) % 26;
+      return str.replace(/[A-Za-z]/g, ch=>{
+        const base = (ch>='a')?97:65;
+        const code = ch.charCodeAt(0)-base;
+        return String.fromCharCode(base + ((code + s) % 26));
+      });
+    }
+
+    // Atbash
+    function atbash(str){
+      return str.replace(/[A-Za-z]/g, ch=>{
+        const isLower = ch>='a';
+        const base = isLower?97:65;
+        const code = ch.charCodeAt(0)-base;
+        return String.fromCharCode(base + (25 - code));
+      });
+    }
+
+    // Vigenère (dir=1 enc, -1 dec)
+    function vigenere(str, key, dir){
+      if(!/^[A-Za-z]+$/.test(key)) throw new Error("Key must be letters only");
+      const k = key.toLowerCase();
+      let j=0;
+      return str.replace(/[A-Za-z]/g, ch=>{
+        const isLower = ch>='a';
+        const base = isLower?97:65;
+        const p = ch.charCodeAt(0)-base;
+        const ks = k.charCodeAt(j%k.length)-97;
+        j++;
+        const c = (p + dir*ks + 26) % 26;
+        return String.fromCharCode(base + c);
+      });
+    }
+
+    // Affine
+    function egcd(a,b){ return b===0 ? [a,1,0] : (()=>{
+      const [g,x1,y1] = egcd(b, a%b); return [g,y1, x1 - Math.floor(a/b)*y1];
+    })(); }
+    function modInv(a,m){
+      const [g,x] = egcd((a%m+m)%m, m);
+      if(g!==1) throw new Error("Invalid 'a' (not coprime with 26)");
+      return (x%m + m)%m;
+    }
+    function affine(str, a, b){
+      if(!Number.isFinite(a)||!Number.isFinite(b)) throw new Error("a,b must be numbers");
+      if([1,3,5,7,9,11,15,17,19,21,23,25].indexOf((a%26+26)%26)===-1) throw new Error("a must be coprime with 26");
+      return str.replace(/[A-Za-z]/g, ch=>{
+        const base = (ch>='a')?97:65;
+        const p = ch.charCodeAt(0)-base;
+        const c = (a*p + b)%26;
+        return String.fromCharCode(base + ((c+26)%26));
+      });
+    }
+    function affineDec(str, a, b){
+      const aInv = modInv(a,26);
+      return str.replace(/[A-Za-z]/g, ch=>{
+        const base = (ch>='a')?97:65;
+        const c = ch.charCodeAt(0)-base;
+        const p = (aInv*(c - b))%26;
+        return String.fromCharCode(base + ((p+26)%26));
+      });
+    }
+
+    // Keyword Substitution (simple monoalphabetic via keyword alphabet)
+    function buildKeywordAlphabet(keyword){
+      if(!/^[A-Za-z]+$/.test(keyword)) throw new Error("Keyword must be letters only");
+      const seen = new Set();
+      let key = "";
+      keyword.toLowerCase().split("").forEach(ch=>{
+        if(!seen.has(ch)) { seen.add(ch); key += ch; }
+      });
+      for(const ch of alpha){ if(!seen.has(ch)) key += ch; }
+      return key; // length 26
+    }
+    function keywordSub(str, keyword, enc=true){
+      const keyAlpha = buildKeywordAlphabet(keyword);
+      const mapEnc = {}; const mapDec = {};
+      for(let i=0;i<26;i++){
+        mapEnc[alpha[i]] = keyAlpha[i];
+        mapDec[keyAlpha[i]] = alpha[i];
+      }
+      return str.replace(/[A-Za-z]/g, ch=>{
+        const isLower = (ch>='a');
+        const low = ch.toLowerCase();
+        const m = enc ? mapEnc[low] : mapDec[low];
+        return isLower ? m : m.toUpperCase();
+      });
+    }
+
+    // Rail Fence
+    function railFenceEnc(text, rails){
+      if(rails<2) throw new Error("Rails must be ≥2");
+      const rows = Array.from({length:rails}, ()=>[]);
+      let r=0, dir=1;
+      for(const ch of text){
+        rows[r].push(ch);
+        r += dir;
+        if(r===rails-1 || r===0) dir *= -1;
+      }
+      return rows.map(a=>a.join("")).join("");
+    }
+    function railFenceDec(cipher, rails){
+      const len = cipher.length;
+      const pattern = [];
+      let r=0, dir=1;
+      for(let i=0;i<len;i++){
+        pattern.push(r);
+        r += dir;
+        if(r===rails-1 || r===0) dir *= -1;
+      }
+      const counts = Array(rails).fill(0);
+      pattern.forEach(p=>counts[p]++);
+      const rows = [];
+      let idx=0;
+      for(let i=0;i<rails;i++){
+        rows[i] = cipher.slice(idx, idx+counts[i]).split("");
+        idx += counts[i];
+      }
+      const res = [];
+      const pos = Array(rails).fill(0);
+      for(let i=0;i<len;i++){
+        const row = pattern[i];
+        res.push(rows[row][pos[row]++]);
+      }
+      return res.join("");
+    }
+
+    // Columnar Transposition
+    function keyOrder(keyword){
+      const chars = keyword.toLowerCase().split("");
+      const indexed = chars.map((c,i)=>({c,i}));
+      indexed.sort((a,b)=> a.c===b.c ? a.i-b.i : (a.c<b.c?-1:1));
+      const order = Array(chars.length);
+      indexed.forEach((obj,rank)=> order[obj.i]=rank);
+      return order;
+    }
+    function columnarEnc(text, keyword){
+      const cols = keyword.length;
+      const order = keyOrder(keyword);
+      const rows = Math.ceil(text.length / cols);
+      const grid = Array.from({length:rows}, ()=>Array(cols).fill(""));
+      for(let i=0;i<text.length;i++){
+        grid[Math.floor(i/cols)][i%cols] = text[i];
+      }
+      let out="";
+      for(let rank=0; rank<cols; rank++){
+        const col = order.indexOf(rank);
+        for(let r=0;r<rows;r++) out += grid[r][col] || "";
+      }
+      return out;
+    }
+    function columnarDec(cipher, keyword){
+      const cols = keyword.length;
+      const order = keyOrder(keyword);
+      const rows = Math.ceil(cipher.length / cols);
+      // column lengths
+      const colLens = Array(cols).fill(rows);
+      const remainder = cipher.length % cols;
+      if(remainder!==0){
+        // Columns with smaller rank get the shorter last row filled first
+        for(let rank=cols-1; rank>=remainder; rank--){
+          const col = order.indexOf(rank);
+          colLens[col]--;
+        }
+      }
+      // fill columns by rank
+      const grid = Array.from({length:rows}, ()=>Array(cols).fill(""));
+      let idx=0;
+      for(let rank=0; rank<cols; rank++){
+        const col = order.indexOf(rank);
+        const len = colLens[col];
+        const slice = cipher.slice(idx, idx+len);
+        idx += len;
+        for(let r=0;r<len;r++){
+          grid[r][col] = slice[r];
+        }
+      }
+      // read row-wise
+      let out="";
+      for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++) out += grid[r][c] || "";
+      }
+      return out;
+    }
+  </script>
+</body>
+</html>
