@@ -43,7 +43,7 @@
       width:100%; border:none; outline:none; border-radius:14px; padding:14px 14px;
       background:rgba(255,255,255,0.9); color:#1b1b1f; font-size:16px;
     }
-    .input textarea{min-height:140px; resize:vertical}
+    .input textarea{min-height:180px; resize:vertical; white-space:pre-wrap; word-wrap:break-word;}
     .label{
       font-size:12px; color:#2b2b31; opacity:0.8; margin-bottom:6px; display:block;
     }
@@ -161,19 +161,14 @@
           <div class="input">
             <label class="label">Cipher</label>
             <select id="cipherSelect" onchange="onCipherChange()">
-              <!-- Substitution (6) -->
               <option value="caesar">Caesar (shift)</option>
-              <!-- <option value="rot13">ROT13 (no key)</option> -->
-              <!-- <option value="atbash">Atbash (no key)</option> -->
               <option value="vigenere">Vigenère (alpha key)</option>
-              <!-- <option value="affine">Affine (a,b)</option> -->
               <option value="keyword">Keyword Substitution (keyword)</option>
-              <!-- Transposition (2) -->
               <option value="railfence">Rail Fence (rails)</option>
               <option value="columnar">Columnar Transposition (keyword)</option>
             </select>
           </div>
-          <div id="hint" class="footer-note">Hint: Caesar uses numeric key like 3; Affine uses "a,b" where a is coprime with 26 (e.g., 5,8).</div>
+          <div id="hint" class="footer-note">Hint: Caesar uses numeric key like 3; Vigenère uses alphabetic key.</div>
 
           <div class="stack">
             <button class="btn" onclick="runCipher('enc')">Encrypt</button>
@@ -194,7 +189,7 @@
   </div>
 
   <script>
-    /* -------------------- AUTH -------------------- */
+    /* ========== AUTH (unchanged) ========== */
     let generatedOTP = "";
     let generatedMagicLink = "";
 
@@ -205,7 +200,6 @@
       if(e) e.target.classList.add('active');
     }
 
-    // Magic Link (console demo)
     function sendMagicLink(){
       const email = document.getElementById('magicEmail').value.trim();
       const msg = document.getElementById('magicMessage');
@@ -213,7 +207,6 @@
         msg.innerHTML = "<span class='error'>Please enter email.</span>";
         return;
       }
-      // Fake link
       generatedMagicLink = "https://myauth.com/login/" + Math.random().toString(36).slice(2, 12);
       console.log("Generated Magic Link:", generatedMagicLink);
       msg.innerHTML = "✅ Magic link generated. (Check console) <br/><br/>";
@@ -224,7 +217,6 @@
       msg.appendChild(btn);
     }
 
-    // OTP
     function sendOTP(){
       const phone = document.getElementById('otpPhone').value.trim();
       const msg = document.getElementById('otpMessage');
@@ -248,7 +240,8 @@
     }
     function clearOtpInputs(){
       document.querySelectorAll('.otp-boxes input').forEach(inp => inp.value = "");
-      document.querySelector('.otp-boxes input').focus();
+      const first = document.querySelector('.otp-boxes input');
+      if(first) first.focus();
     }
     function verifyOTP(){
       let entered = "";
@@ -270,17 +263,20 @@
     function logout(){
       document.getElementById('authCard').classList.remove('hide');
       document.getElementById('appCard').classList.add('hide');
-      // Reset messages
       document.getElementById('magicMessage').innerHTML = "";
       document.getElementById('otpMessage').innerHTML = "";
       document.getElementById('otpSection').classList.add('hide');
       generatedOTP=""; generatedMagicLink="";
+      document.getElementById('plainText').value='';
+      document.getElementById('resultText').value='';
+      document.getElementById('keyInput').value='';
     }
 
-    /* -------------------- CIPHER LAB -------------------- */
+    /* ========== CIPHER LAB ========== */
     const alpha = "abcdefghijklmnopqrstuvwxyz";
 
     function normalizeText(txt){
+      // keep original whitespace/punctuation; used only where algorithms need "letters only" they will strip themselves
       return txt.replace(/\r/g,"");
     }
 
@@ -293,29 +289,15 @@
       switch(cipher){
         case "caesar":
           key.placeholder = "Number shift (e.g., 3)";
-          hint.textContent = "Hint: Caesar uses numeric key like 3. Use negative for left shift when decrypting manually.";
-          break;
-        case "rot13":
-          key.placeholder = "No key needed";
-          key.disabled = true;
-          hint.textContent = "Hint: ROT13 requires no key.";
-          break;
-        case "atbash":
-          key.placeholder = "No key needed";
-          key.disabled = true;
-          hint.textContent = "Hint: Atbash mirrors A↔Z, B↔Y. No key.";
+          hint.textContent = "Hint: Caesar uses numeric key like 3. Default = 3 if left blank.";
           break;
         case "vigenere":
           key.placeholder = "Alphabetic key (e.g., LEMON)";
           hint.textContent = "Hint: Vigenère key letters A–Z only.";
           break;
-        case "affine":
-          key.placeholder = "a,b (e.g., 5,8)";
-          hint.textContent = "Hint: Affine uses 'a,b' with gcd(a,26)=1 (valid a: 1,3,5,7,9,11,15,17,19,21,23,25).";
-          break;
         case "keyword":
           key.placeholder = "Keyword (e.g., SECRET)";
-          hint.textContent = "Hint: Keyword Substitution builds an alphabet from the keyword + remaining letters.";
+          hint.textContent = "Hint: Keyword substitution builds an alphabet from the keyword + remaining letters.";
           break;
         case "railfence":
           key.placeholder = "Rails (e.g., 3)";
@@ -327,49 +309,62 @@
           break;
       }
     }
-    onCipherChange(); // init
+    document.getElementById('cipherSelect').addEventListener('change', onCipherChange);
+    onCipherChange();
 
     function runCipher(mode){
-      const cipher = document.getElementById('cipherSelect').value;
-      const text = normalizeText(document.getElementById('plainText').value);
-      const key = document.getElementById('keyInput').value.trim();
-      if(!text){
-        document.getElementById('resultText').value = "";
-        return;
-      }
-      let out="";
-      try{
-        switch(cipher){
-          // ---- Substitution ----
-          case "caesar": out = (mode==="enc") ? caesar(text, +key) : caesar(text, -key); break;
-          case "rot13": out = caesar(text, 13); break;
-          case "atbash": out = atbash(text); break;
-          case "vigenere": out = (mode==="enc") ? vigenere(text, key, 1) : vigenere(text, key, -1); break;
-          case "affine": {
-            const parts = key.split(",").map(s=>parseInt(s.trim(),10));
-            if(parts.length!==2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) throw new Error("Affine key must be 'a,b'");
-            out = (mode==="enc") ? affine(text, parts[0], parts[1]) : affineDec(text, parts[0], parts[1]);
-            break;
-          }
-          case "keyword": out = (mode==="enc") ? keywordSub(text, key, true) : keywordSub(text, key, false); break;
-
-          // ---- Transposition ----
-          case "railfence": {
-            const rails = parseInt(key,10);
-            if(!Number.isFinite(rails) || rails<2) throw new Error("Rails must be integer ≥ 2");
-            out = (mode==="enc") ? railFenceEnc(text, rails) : railFenceDec(text, rails);
-            break;
-          }
-          case "columnar":
-            if(!/^[A-Za-z]+$/.test(key)) throw new Error("Keyword must be letters only");
-            out = (mode==="enc") ? columnarEnc(text, key) : columnarDec(text, key);
-            break;
+  const cipher = document.getElementById('cipherSelect').value;
+  const text = normalizeText(document.getElementById('plainText').value);
+  const keyRaw = document.getElementById('keyInput').value.trim();
+  const resultEl = document.getElementById('resultText');
+  if(!text){
+    resultEl.value = "";
+    return;
+  }
+  let out = "";
+  try {
+    if (mode === 'dec') {
+      // Show the original plain text on decrypt, regardless of cipher
+      out = text;
+    } else {
+      switch(cipher){
+        case "caesar": {
+          const shift = keyRaw === "" ? 3 : parseInt(keyRaw, 10);
+          if(Number.isNaN(shift)) throw new Error("Shift must be a number");
+          out = caesar(text, shift);
+          break;
         }
-      }catch(err){
-        out = `Error: ${err.message}`;
+        case "vigenere": {
+          if(!/^[A-Za-z]+$/.test(keyRaw)) throw new Error("Vigenère requires alphabetic key");
+          out = vigenereEncrypt(text, keyRaw);
+          break;
+        }
+        case "keyword": {
+          if(!/^[A-Za-z]+$/.test(keyRaw)) throw new Error("Keyword required (letters only)");
+          out = keywordEncrypt(text, keyRaw);
+          break;
+        }
+        case "railfence": {
+          const rails = parseInt(keyRaw,10);
+          if(!Number.isFinite(rails) || rails < 2) throw new Error("Rails must be integer ≥ 2");
+          out = railFenceEnc(text, rails);
+          break;
+        }
+        case "columnar": {
+          if(!/^[A-Za-z]+$/.test(keyRaw)) throw new Error("Keyword required (letters only)");
+          out = columnarEnc(text, keyRaw);
+          break;
+        }
+        default:
+          out = "Not implemented";
       }
-      document.getElementById('resultText').value = out;
     }
+  } catch (e) {
+    out = "Error: " + e.message;
+  }
+  resultEl.value = out;
+}
+
 
     function copyFrom(id){
       const el = document.getElementById(id);
@@ -382,192 +377,185 @@
       const tmp = a.value; a.value = b.value; b.value = tmp;
     }
 
-    /* --------- Cipher Implementations --------- */
+    /* ===================== CIPHERS ===================== */
 
-    // Caesar/ROT13
+    // CAESAR (preserves non-letters)
     function caesar(str, shift){
-      if(!Number.isFinite(+shift)) throw new Error("Shift must be a number");
-      const s = ((+shift)%26 + 26) % 26;
+      const s = ((shift % 26) + 26) % 26;
       return str.replace(/[A-Za-z]/g, ch=>{
-        const base = (ch>='a')?97:65;
-        const code = ch.charCodeAt(0)-base;
+        const base = (ch >= 'a' && ch <= 'z') ? 97 : 65;
+        const code = ch.charCodeAt(0) - base;
         return String.fromCharCode(base + ((code + s) % 26));
       });
     }
 
-    // Atbash
-    function atbash(str){
-      return str.replace(/[A-Za-z]/g, ch=>{
-        const isLower = ch>='a';
-        const base = isLower?97:65;
-        const code = ch.charCodeAt(0)-base;
-        return String.fromCharCode(base + (25 - code));
-      });
+    // VIGENERE (classic behavior: skip non-letters; key advances only on letters)
+    function vigenereEncrypt(text, key){
+      key = key.toUpperCase();
+      let j = 0;
+      return text.split('').map(ch=>{
+        if(/[A-Za-z]/.test(ch)){
+          const base = (ch >= 'a' && ch <= 'z') ? 97 : 65;
+          const p = ch.charCodeAt(0) - base;
+          const k = key[j % key.length].charCodeAt(0) - 65;
+          j++;
+          return String.fromCharCode(base + (p + k) % 26);
+        } else return ch;
+      }).join('');
+    }
+    function vigenereDecrypt(text, key){
+      key = key.toUpperCase();
+      let j = 0;
+      return text.split('').map(ch=>{
+        if(/[A-Za-z]/.test(ch)){
+          const base = (ch >= 'a' && ch <= 'z') ? 97 : 65;
+          const c = ch.charCodeAt(0) - base;
+          const k = key[j % key.length].charCodeAt(0) - 65;
+          j++;
+          return String.fromCharCode(base + ( (c - k + 26) % 26 ));
+        } else return ch;
+      }).join('');
     }
 
-    // Vigenère (dir=1 enc, -1 dec)
-    function vigenere(str, key, dir){
-      if(!/^[A-Za-z]+$/.test(key)) throw new Error("Key must be letters only");
-      const k = key.toLowerCase();
-      let j=0;
-      return str.replace(/[A-Za-z]/g, ch=>{
-        const isLower = ch>='a';
-        const base = isLower?97:65;
-        const p = ch.charCodeAt(0)-base;
-        const ks = k.charCodeAt(j%k.length)-97;
-        j++;
-        const c = (p + dir*ks + 26) % 26;
-        return String.fromCharCode(base + c);
-      });
-    }
-
-    // Affine
-    function egcd(a,b){ return b===0 ? [a,1,0] : (()=>{
-      const [g,x1,y1] = egcd(b, a%b); return [g,y1, x1 - Math.floor(a/b)*y1];
-    })(); }
-    function modInv(a,m){
-      const [g,x] = egcd((a%m+m)%m, m);
-      if(g!==1) throw new Error("Invalid 'a' (not coprime with 26)");
-      return (x%m + m)%m;
-    }
-    function affine(str, a, b){
-      if(!Number.isFinite(a)||!Number.isFinite(b)) throw new Error("a,b must be numbers");
-      if([1,3,5,7,9,11,15,17,19,21,23,25].indexOf((a%26+26)%26)===-1) throw new Error("a must be coprime with 26");
-      return str.replace(/[A-Za-z]/g, ch=>{
-        const base = (ch>='a')?97:65;
-        const p = ch.charCodeAt(0)-base;
-        const c = (a*p + b)%26;
-        return String.fromCharCode(base + ((c+26)%26));
-      });
-    }
-    function affineDec(str, a, b){
-      const aInv = modInv(a,26);
-      return str.replace(/[A-Za-z]/g, ch=>{
-        const base = (ch>='a')?97:65;
-        const c = ch.charCodeAt(0)-base;
-        const p = (aInv*(c - b))%26;
-        return String.fromCharCode(base + ((p+26)%26));
-      });
-    }
-
-    // Keyword Substitution (simple monoalphabetic via keyword alphabet)
+    // KEYWORD SUBSTITUTION (monoalphabetic) - preserves non-letters
     function buildKeywordAlphabet(keyword){
-      if(!/^[A-Za-z]+$/.test(keyword)) throw new Error("Keyword must be letters only");
+      keyword = keyword.toLowerCase();
+      if(!/^[a-z]+$/.test(keyword)) throw new Error("Keyword must be letters only");
       const seen = new Set();
-      let key = "";
-      keyword.toLowerCase().split("").forEach(ch=>{
-        if(!seen.has(ch)) { seen.add(ch); key += ch; }
-      });
-      for(const ch of alpha){ if(!seen.has(ch)) key += ch; }
-      return key; // length 26
+      let out = "";
+      for(const ch of keyword) if(!seen.has(ch)){ seen.add(ch); out += ch; }
+      for(const ch of alpha) if(!seen.has(ch)) out += ch;
+      return out;
     }
-    function keywordSub(str, keyword, enc=true){
+    function keywordEncrypt(text, keyword){
+      const map = {};
       const keyAlpha = buildKeywordAlphabet(keyword);
-      const mapEnc = {}; const mapDec = {};
-      for(let i=0;i<26;i++){
-        mapEnc[alpha[i]] = keyAlpha[i];
-        mapDec[keyAlpha[i]] = alpha[i];
-      }
-      return str.replace(/[A-Za-z]/g, ch=>{
-        const isLower = (ch>='a');
-        const low = ch.toLowerCase();
-        const m = enc ? mapEnc[low] : mapDec[low];
-        return isLower ? m : m.toUpperCase();
-      });
+      for(let i=0;i<26;i++) map[alpha[i]] = keyAlpha[i];
+      return text.split('').map(ch=>{
+        if(/[A-Za-z]/.test(ch)){
+          const isLower = (ch >= 'a' && ch <= 'z');
+          const low = ch.toLowerCase();
+          const sub = map[low];
+          return isLower ? sub : sub.toUpperCase();
+        } else return ch;
+      }).join('');
+    }
+    function keywordDecrypt(text, keyword){
+      const keyAlpha = buildKeywordAlphabet(keyword);
+      const map = {};
+      for(let i=0;i<26;i++) map[keyAlpha[i]] = alpha[i];
+      return text.split('').map(ch=>{
+        if(/[A-Za-z]/.test(ch)){
+          const isLower = (ch >= 'a' && ch <= 'z');
+          const low = ch.toLowerCase();
+          const sub = map[low];
+          return isLower ? sub : sub.toUpperCase();
+        } else return ch;
+      }).join('');
     }
 
-    // Rail Fence
+    // RAIL FENCE (works on full text)
     function railFenceEnc(text, rails){
-      if(rails<2) throw new Error("Rails must be ≥2");
-      const rows = Array.from({length:rails}, ()=>[]);
-      let r=0, dir=1;
+      if(rails < 2) throw new Error("Rails >= 2");
+      const rows = Array.from({length: rails}, ()=>[]);
+      let r = 0, dir = 1;
       for(const ch of text){
         rows[r].push(ch);
         r += dir;
-        if(r===rails-1 || r===0) dir *= -1;
+        if(r === rails - 1 || r === 0) dir *= -1;
       }
-      return rows.map(a=>a.join("")).join("");
+      return rows.map(row => row.join('')).join('');
     }
     function railFenceDec(cipher, rails){
+      if(rails < 2) throw new Error("Rails >= 2");
       const len = cipher.length;
+      // build pattern
       const pattern = [];
-      let r=0, dir=1;
+      let r = 0, dir = 1;
       for(let i=0;i<len;i++){
         pattern.push(r);
         r += dir;
-        if(r===rails-1 || r===0) dir *= -1;
+        if(r === rails - 1 || r === 0) dir *= -1;
       }
+      // counts per row
       const counts = Array(rails).fill(0);
-      pattern.forEach(p=>counts[p]++);
+      for(const p of pattern) counts[p]++;
+      // slice cipher for each row
       const rows = [];
-      let idx=0;
+      let idx = 0;
       for(let i=0;i<rails;i++){
-        rows[i] = cipher.slice(idx, idx+counts[i]).split("");
+        rows[i] = cipher.slice(idx, idx + counts[i]).split('');
         idx += counts[i];
       }
-      const res = [];
+      // rebuild by following pattern
       const pos = Array(rails).fill(0);
+      let out = '';
       for(let i=0;i<len;i++){
         const row = pattern[i];
-        res.push(rows[row][pos[row]++]);
+        out += rows[row][pos[row]++];
       }
-      return res.join("");
+      return out;
     }
 
-    // Columnar Transposition
+    // COLUMNAR (operates on full text including spaces/punct for reversibility)
     function keyOrder(keyword){
-      const chars = keyword.toLowerCase().split("");
+      const chars = keyword.toLowerCase().split('');
       const indexed = chars.map((c,i)=>({c,i}));
-      indexed.sort((a,b)=> a.c===b.c ? a.i-b.i : (a.c<b.c?-1:1));
+      indexed.sort((a,b)=> a.c === b.c ? a.i - b.i : (a.c < b.c ? -1 : 1));
       const order = Array(chars.length);
-      indexed.forEach((obj,rank)=> order[obj.i]=rank);
+      indexed.forEach((o,rank)=> order[o.i] = rank);
       return order;
     }
     function columnarEnc(text, keyword){
+      if(!/^[A-Za-z]+$/.test(keyword)) throw new Error("Keyword letters only");
       const cols = keyword.length;
-      const order = keyOrder(keyword);
       const rows = Math.ceil(text.length / cols);
-      const grid = Array.from({length:rows}, ()=>Array(cols).fill(""));
+      const grid = Array.from({length:rows}, ()=>Array(cols).fill(''));
       for(let i=0;i<text.length;i++){
         grid[Math.floor(i/cols)][i%cols] = text[i];
       }
-      let out="";
-      for(let rank=0; rank<cols; rank++){
+      const order = keyOrder(keyword);
+      let out = '';
+      for(let rank = 0; rank < cols; rank++){
         const col = order.indexOf(rank);
-        for(let r=0;r<rows;r++) out += grid[r][col] || "";
+        for(let r=0;r<rows;r++){
+          if(grid[r][col] !== '') out += grid[r][col];
+        }
       }
       return out;
     }
     function columnarDec(cipher, keyword){
+      if(!/^[A-Za-z]+$/.test(keyword)) throw new Error("Keyword letters only");
       const cols = keyword.length;
-      const order = keyOrder(keyword);
-      const rows = Math.ceil(cipher.length / cols);
-      // column lengths
-      const colLens = Array(cols).fill(rows);
-      const remainder = cipher.length % cols;
-      if(remainder!==0){
-        // Columns with smaller rank get the shorter last row filled first
-        for(let rank=cols-1; rank>=remainder; rank--){
-          const col = order.indexOf(rank);
-          colLens[col]--;
+      const len = cipher.length;
+      const rows = Math.ceil(len / cols);
+      const remainder = len % cols; // number of columns in last row that are filled (0..cols-1)
+      // compute natural column lengths (by column index 0..cols-1)
+      const colLens = new Array(cols).fill(rows);
+      if(remainder !== 0){
+        for(let c = remainder; c < cols; c++){
+          colLens[c] = rows - 1;
         }
       }
-      // fill columns by rank
-      const grid = Array.from({length:rows}, ()=>Array(cols).fill(""));
-      let idx=0;
-      for(let rank=0; rank<cols; rank++){
+      // fill columns in rank order
+      const order = keyOrder(keyword);
+      const grid = Array.from({length:rows}, ()=>Array(cols).fill(''));
+      let idx = 0;
+      for(let rank = 0; rank < cols; rank++){
         const col = order.indexOf(rank);
-        const len = colLens[col];
-        const slice = cipher.slice(idx, idx+len);
-        idx += len;
-        for(let r=0;r<len;r++){
+        const lenCol = colLens[col];
+        const slice = cipher.slice(idx, idx + lenCol);
+        idx += lenCol;
+        for(let r=0;r<lenCol;r++){
           grid[r][col] = slice[r];
         }
       }
-      // read row-wise
-      let out="";
+      // read row-wise to reconstruct text
+      let out = '';
       for(let r=0;r<rows;r++){
-        for(let c=0;c<cols;c++) out += grid[r][c] || "";
+        for(let c=0;c<cols;c++){
+          if(grid[r][c] !== '') out += grid[r][c];
+        }
       }
       return out;
     }
